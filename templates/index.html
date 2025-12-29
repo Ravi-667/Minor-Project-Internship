@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Workspace</title>
+    
+    <style>
+        /* Fallback to system fonts if Inter isn't available locally */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f1117; color: #e5e7eb; }
+    </style>
+
+    <script src="/static/tailwind.js"></script>
+    <script src="/static/marked.min.js"></script>
+    
+    <link rel="stylesheet" href="/static/highlight.min.css">
+    <script src="/static/highlight.min.js"></script>
+
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="/static/mathjax.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f1117; color: #e5e7eb; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        
+        .prose pre { background: #1e1e1e !important; padding: 1rem; border-radius: 0.5rem; margin-top: 10px; }
+        .prose code { color: #e06c75; font-family: monospace; }
+        .prose p { margin-bottom: 0.8rem; line-height: 1.6; }
+        /* MathJax Spacing Fix */
+        mjx-container { margin: 0 !important; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message-anim { animation: fadeIn 0.3s ease-out forwards; }
+        .cursor-blink::after { content: '▋'; color: #60a5fa; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <aside class="w-64 bg-[#161b22] border-r border-gray-800 flex flex-col hidden md:flex">
+        <div class="p-6 border-b border-gray-800 flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">AI</div>
+            <h1 class="font-semibold text-lg tracking-wide">Synapse</h1>
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto">
+            <div class="mb-6">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Controls</p>
+                <button onclick="resetSession()" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded hover:bg-red-500/20 transition">
+                    Reset Memory
+                </button>
+            </div>
+        </div>
+        <div class="p-4 border-t border-gray-800 text-xs text-gray-500 text-center">Powered by DeepSeek-R1 & Qdrant</div>
+        <div class="mt-6 border-t border-gray-800 pt-6">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Live Status</p>
+    
+    <div class="flex items-center gap-2 mb-4">
+        <div id="status-dot" class="w-2 h-2 rounded-full bg-green-500 transition-colors"></div>
+        <span id="agent-mode" class="text-sm text-gray-300 font-mono">CHAT MODE</span>
+    </div>
+
+    <div id="quiz-dashboard" class="hidden bg-[#1f2937] p-3 rounded-lg border border-gray-700">
+            <div class="text-xs text-blue-400 mb-1 uppercase">Current Quiz</div>
+            <div id="quiz-topic" class="text-sm font-bold text-white mb-2 truncate">General</div>
+            <div class="flex justify-between items-end">
+                <div class="text-xs text-gray-400">Score</div>
+                <div class="text-xl font-bold text-green-400">
+                    <span id="quiz-score">0</span>/<span id="quiz-total">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative bg-[#0f1117]">
+        <div class="md:hidden p-4 bg-[#161b22] border-b border-gray-800 flex justify-between items-center">
+            <span class="font-bold">Synapse</span>
+            <button onclick="resetSession()" class="text-xs text-red-400 border border-red-500/30 px-2 py-1 rounded">Reset</button>
+        </div>
+
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth">
+            <div class="flex gap-4 max-w-4xl mx-auto message-anim">
+                <div class="w-8 h-8 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center text-sm font-bold">AI</div>
+                <div class="bg-[#1f2937] px-5 py-4 rounded-2xl rounded-tl-none border border-gray-700 shadow-sm text-gray-200">
+                    <p>Hello! I am ready. </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 md:p-6 bg-gradient-to-t from-[#0f1117] via-[#0f1117] to-transparent">
+            <div class="max-w-4xl mx-auto relative group">
+                <div id="image-preview-container" class="hidden absolute -top-16 left-0 bg-[#1f2937] p-2 rounded-lg border border-gray-600 shadow-lg flex items-center gap-3 animate-fade-in">
+                    <img id="image-preview" class="w-10 h-10 rounded object-cover border border-gray-500">
+                    <span class="text-xs text-blue-300">Image attached</span>
+                    <button onclick="clearImage()" class="text-gray-400 hover:text-white bg-gray-700 rounded-full w-5 h-5 flex items-center justify-center text-xs">✕</button>
+                </div>
+
+                <div class="relative bg-[#1f2937] border border-gray-700 rounded-xl shadow-lg focus-within:ring-2 focus-within:ring-blue-500/50 focus-within:border-blue-500 transition-all">
+                    <textarea id="user-input" rows="1" class="w-full bg-transparent text-gray-200 px-4 py-4 pr-24 outline-none resize-none max-h-48 scrollbar-hide" placeholder="Send a message..."></textarea>
+                    <div class="absolute right-2 bottom-2 flex items-center gap-1">
+                        <button onclick="document.getElementById('file-upload').click()" class="p-2 text-gray-400 hover:text-blue-400 hover:bg-gray-700/50 rounded-lg transition">📎</button>
+                        <input type="file" id="file-upload" class="hidden" accept="image/*" onchange="handleImageUpload()">
+                        <button id="send-btn" onclick="sendMessage()" class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">🚀</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        let currentImageBase64 = null;
+
+        // Auto-resize
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if(this.value === '') this.style.height = 'auto';
+        });
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text && !currentImageBase64) return;
+
+            addMessage("user", text);
+            userInput.value = ''; userInput.style.height = 'auto';
+            
+            const aiBubble = addMessage("ai");
+            const aiContent = aiBubble.querySelector('.prose');
+            aiContent.classList.add('cursor-blink');
+
+            const payload = { query: text, image_data: currentImageBase64 };
+            clearImage();
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    fullText += decoder.decode(value, { stream: true });
+                    // Update Markdown
+                    aiContent.innerHTML = marked.parse(fullText);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+                
+                // FINALIZATION: Render Math & Highlight Code
+                aiContent.classList.remove('cursor-blink');
+                hljs.highlightAll();
+                if (window.MathJax) {
+                    MathJax.typesetPromise([aiContent]).catch(err => console.log(err));
+                }
+
+            } catch (err) {
+                aiContent.innerHTML = `<span class="text-red-400">Error: ${err.message}</span>`;
+            }
+        }
+
+        async function resetSession() {
+            await fetch('/reset', { method: 'POST' });
+            chatContainer.innerHTML = '';
+            addMessage("ai", "Memory reset. Starting fresh!");
+        }
+
+        function addMessage(role, text = "") {
+            const div = document.createElement('div');
+            div.className = "flex gap-4 max-w-4xl mx-auto message-anim group";
+            
+            const avatar = document.createElement('div');
+            avatar.className = `w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold shadow-lg ${role === 'user' ? 'bg-gray-600 order-2' : 'bg-blue-600'}`;
+            avatar.innerText = role === 'user' ? 'U' : 'AI';
+
+            const bubble = document.createElement('div');
+            bubble.className = `px-5 py-4 rounded-2xl shadow-sm text-gray-200 border border-gray-700/50 max-w-[85%] ${role === 'user' ? 'bg-[#2b3b55] rounded-tr-none order-1 ml-auto' : 'bg-[#1f2937] rounded-tl-none w-full prose prose-invert max-w-none'}`;
+            
+            if (role === 'user') {
+                bubble.innerText = text;
+                if (currentImageBase64) {
+                    const img = document.createElement("img");
+                    img.src = "data:image/jpeg;base64," + currentImageBase64;
+                    img.className = "mt-3 h-32 rounded-lg border border-gray-600";
+                    bubble.appendChild(img);
+                }
+            }
+            
+            div.appendChild(avatar);
+            div.appendChild(bubble);
+            chatContainer.appendChild(div);
+            return div;
+        }
+
+        function handleImageUpload() {
+            const file = document.getElementById('file-upload').files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    currentImageBase64 = e.target.result.split(',')[1];
+                    document.getElementById('image-preview').src = e.target.result;
+                    document.getElementById('image-preview-container').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        function clearImage() {
+            currentImageBase64 = null;
+            document.getElementById('image-preview').classList.add('hidden');
+            document.getElementById('file-upload').value = "";
+        }
+        // Poll the agent state every 2 seconds
+// Poll the agent state every 2 seconds
+setInterval(async () => {
+    try {
+        const response = await fetch('/health');
+        const data = await response.json();
+        
+        // 1. Update Mode Text
+        const modeLabel = document.getElementById('agent-mode');
+        const dot = document.getElementById('status-dot');
+        const quizDash = document.getElementById('quiz-dashboard');
+        
+        if (!modeLabel) return; // Safety check
+
+        modeLabel.innerText = (data.mode || "CHAT").toUpperCase() + " MODE";
+        
+        // 2. Adaptive Styling
+        if (data.mode === 'quiz') {
+            dot.className = "w-2 h-2 rounded-full bg-purple-500 animate-pulse";
+            modeLabel.className = "text-sm text-purple-300 font-mono font-bold";
+            
+            // SHOW DASHBOARD & UPDATE SCORES
+            quizDash.classList.remove('hidden');
+            document.getElementById('quiz-topic').innerText = data.current_quiz || "General";
+            
+            // --- CRITICAL FIX HERE ---
+            document.getElementById('quiz-score').innerText = data.quiz_score; 
+            document.getElementById('quiz-total').innerText = data.quiz_count;
+            // -------------------------
+            
+        } else if (data.mode === 'study') {
+            dot.className = "w-2 h-2 rounded-full bg-yellow-500";
+            modeLabel.className = "text-sm text-yellow-300 font-mono";
+            quizDash.classList.add('hidden');
+            
+        } else {
+            // Default Chat
+            dot.className = "w-2 h-2 rounded-full bg-green-500";
+            modeLabel.className = "text-sm text-gray-300 font-mono";
+            quizDash.classList.add('hidden');
+        }
+
+    } catch (err) {
+        console.log("Agent offline", err);
+    }
+}, 2000);
+    </script>
+</body>
+</html>
